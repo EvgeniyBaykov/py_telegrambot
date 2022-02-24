@@ -4,3 +4,4 @@ env/
 .git/
 .idea/
 __pycache__/
+test_requests.py

@@ -6,7 +6,7 @@ from botrequests.lowprice import lowprice
 from botrequests.history import history
 
 
-token_bot: object = config('telegram_bot_token')
+token_bot = config('telegram_bot_token')
 bot = telebot.TeleBot(token_bot)
 
 
