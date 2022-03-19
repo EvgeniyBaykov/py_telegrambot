@@ -24,6 +24,8 @@ venv, который идёт в поставке Python 3.
 Переименовать файл `.env.template` в `.env`. В этом файле необходимо присвоить 
 соответствующим переменным токен telegram бота и ключ от API https://rapidapi.com/
 
+Создать в директории `python_basic_diploma` директорию `log`
+
 Установить пакеты командой `pip install -r requirements.txt`
 
 ###Внешние пакеты:
