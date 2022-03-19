@@ -2,20 +2,26 @@ from telebot import types
 import requests
 from decouple import config
 import re
-from typing import Dict, Tuple, List, Union
+from typing import Dict, List, Union
 import logging
 from .history import num_nights
+from .db_functions import set_city, get_request_low_high, set_request
+from settings import photo_size
 
-__all__ = ['get_cities_from_rapidapi', 'get_hotels_from_rapidapi', 'get_photos_from_rapidapi']
+__all__ = ['get_cities_from_rapidapi', 'get_hotels_from_rapidapi_lowprice', 'get_photos_from_rapidapi_low',
+           'get_total_price']
 
 log = logging.getLogger(__name__)
 
 
-def get_cities_from_rapidapi(city: str) -> Union[Dict[str, str], str]:
+def get_cities_from_rapidapi(city: str, user_id: int) -> Union[Dict[str, str], str]:
     """
     Функция, которая принимает строку и ищет на rapidapi все города с совпадением по строке.
-    Возвращает словарь - id города: название
+    Возвращает словарь - id города: название.
+    Если ничего не найдено, возвращает строку "Null".
+    В случае ошибки с API возвращает строку "Error"
     :param city: искомый город
+    :param user_id: id пользователя
     """
 
     url = "https://hotels4.p.rapidapi.com/locations/v2/search"
@@ -27,27 +33,38 @@ def get_cities_from_rapidapi(city: str) -> Union[Dict[str, str], str]:
     querystring_city = {"query": city, "locale": "ru_RU"}
 
     try:
-        response = requests.request("GET", url, headers=headers, params=querystring_city, timeout=20).json()
+        response = requests.request("GET", url, headers=headers, params=querystring_city, timeout=15).json()
 
         city_dct = dict()
-        pattern_city = r"(.*)<.*?>(.+)</span>(.*)"
-        for i_city in response['suggestions'][0]['entities']:
+        cities_lst = response['suggestions'][0]['entities']
+        if not cities_lst:
+            return 'Null'
+
+        for i_city in cities_lst:
             if i_city['type'] == 'CITY':
-                city = ''.join(re.findall(pattern_city, i_city['caption'])[0])
+                city = re.sub(r"<span class='highlighted'>", '', i_city['caption'])
+                city = re.sub(r"</span>", '', city)
                 city_dct[i_city["destinationId"]] = city
+
+            set_city(str(city_dct)[1:-1], user_id)
+
         return city_dct
 
-    except (requests.exceptions.ConnectionError,  requests.exceptions.ReadTimeout, requests.exceptions.JSONDecodeError,
-            TypeError, KeyError, IndexError) as error:   # мне попадалась эта ошибка, почему она подсвечена? requests.exceptions.JSONDecodeError
-        log.error('Ошибка с получением города', exc_info=error)
-        return 'Технические неполадки с сайтом, попробуйте еще раз.'
+    except (requests.exceptions.ConnectionError,  requests.exceptions.ConnectTimeout, TypeError, KeyError,
+            requests.exceptions.JSONDecodeError, requests.exceptions.ReadTimeout, IndexError) as error:   # мне попадалась эта ошибка, почему она подсвечена? requests.exceptions.JSONDecodeError
+        log.error('Ошибка с получением города. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
+
+        return 'Error'
 
 
-def get_hotels_from_rapidapi(data: Tuple) -> Union[Dict[int, dict[Union[str, str]]], str]:
+def get_hotels_from_rapidapi_lowprice(user_id: int, request_id: int) -> Union[Dict[int, dict[Union[str, str]]], str]:
     """
     Функция, которая по заданному запросу ищет отели на rapidapi.
-    Возвращает словарь с данными отелей.
-    :param data: данные для запроса
+    Добавляет полученный ответ в БД (history_requests [request]), если его не было. Возвращает словарь с данными отелей.
+    Если ничего не найдено, возвращает строку "По вашему запросу ничего не найдено.".
+    В случае ошибки с API возвращает строку "Технические неполадки с сайтом, попробуйте еще раз."
+    :param user_id: id пользователя
+    :param request_id: id запроса
     """
 
     url = "https://hotels4.p.rapidapi.com/properties/list"
@@ -56,48 +73,62 @@ def get_hotels_from_rapidapi(data: Tuple) -> Union[Dict[int, dict[Union[str, str
         'x-rapidapi-key': config('x-rapidapi-key')
     }
 
-    querystring_hotel = {"destinationId": data[0], "checkIn": data[1], "checkOut": data[2],
-                         "pageSize": data[3], "pageNumber": "1", "adults1": "1", "sortOrder": "PRICE",
+    id_city, check_in, check_out, num_hotels, photos, request = get_request_low_high(request_id)
+
+    querystring_hotel = {"destinationId": id_city, "checkIn": check_in, "checkOut": check_out,
+                         "pageSize": num_hotels, "pageNumber": "1", "adults1": "1", "sortOrder": "PRICE",
                          "locale": "ru_RU", "currency": "RUB"
                          }
 
+    hotel_dct = dict()
     try:
-        response = requests.request("GET", url, headers=headers, params=querystring_hotel, timeout=20).json()
+        response = requests.request("GET", url, headers=headers, params=querystring_hotel, timeout=15).json()
+        log.info('user_id: {user_id}. Получен ответ: {res}.'.format(user_id=user_id, res=response))
 
-        hotel_dct = dict()
-        nights = num_nights(data[1], data[2])
-        for i_hotel in response['data']['body']['searchResults']['results']:
+        nights = num_nights(check_in, check_out)
+        hotels_lst = response['data']['body']['searchResults']['results']
+        if not hotels_lst:
+            return 'По вашему запросу ничего не найдено.'
+
+        for i_hotel in hotels_lst:
             i_hotel_dct = dict()
-            distance = i_hotel['landmarks'][0]['distance']
             price = i_hotel['ratePlan']['price']['current']
 
             i_hotel_dct['Название отеля'] = i_hotel['name']
-            i_hotel_dct['Адрес'] = i_hotel['address']['streetAddress']
-            i_hotel_dct['Расстояние до центра'] = get_distance(distance)
+            try:
+                i_hotel_dct['Адрес'] = i_hotel['address']['streetAddress']
+            except KeyError:
+                i_hotel_dct['Адрес'] = 'None'
+            i_hotel_dct['Расстояние до центра'] = i_hotel['landmarks'][0]['distance']
             i_hotel_dct['Цена за ночь'] = i_hotel['ratePlan']['price']['current']
             i_hotel_dct[f'Цена за {nights} ночей'] = get_total_price(price, nights)
-            i_hotel_dct['Сайт'] = ''.join(('https://hotels.com/ho', str(i_hotel['id'])))
+            i_hotel_dct['url'] = ''.join(('https://hotels.com/ho', str(i_hotel['id'])))
 
-            if data[4]:
-                photo_lst = get_photos_from_rapidapi(i_hotel['id'], data[4])
-
+            if photos:
+                photo_lst = get_photos_from_rapidapi_low(i_hotel['id'], photos)
                 if photo_lst is str:
                     raise requests.exceptions.ConnectionError
 
                 i_hotel_dct['photos'] = photo_lst
             hotel_dct[i_hotel['id']]: int = i_hotel_dct
 
+        if not request:
+            set_request(user_id, hotel_dct)
+
         return hotel_dct
 
-    except (requests.exceptions.ConnectionError, TypeError, KeyError, requests.exceptions.ConnectTimeout) as error:
-        log.error('Ошибка с получением отелей', exc_info=error)
+    except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, TypeError, KeyError,
+            requests.exceptions.JSONDecodeError, requests.exceptions.ReadTimeout) as error:
+        log.error('Ошибка с получением отелей. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
+
         return 'Технические неполадки с сайтом, попробуйте еще раз.'
 
 
-def get_photos_from_rapidapi(hotel_id, num_photos) -> Union[List[types.InputMediaPhoto], str]:
+def get_photos_from_rapidapi_low(hotel_id, num_photos) -> Union[List[types.InputMediaPhoto], str]:
     """
     Функция, которая для заданного отеля ищет на rapidapi заданное количество фотографий и
-    возвращает список из types.InputMediaPhoto
+    возвращает список из types.InputMediaPhoto.
+    В случае ошибки возвращает строку "Error".
     :param hotel_id: id отеля
     :param num_photos: количество фотографий
     """
@@ -111,8 +142,8 @@ def get_photos_from_rapidapi(hotel_id, num_photos) -> Union[List[types.InputMedi
     }
 
     try:
-        response = requests.request("GET", url, headers=headers, params=querystring).json()
-        size = 'b'
+        response = requests.request("GET", url, headers=headers, params=querystring, timeout=15).json()
+        size = photo_size
         photos_lst = list()
         for i_photo in range(int(num_photos)):
             url_photo = response['hotelImages'][i_photo]['baseUrl'].format(size=size)
@@ -121,9 +152,11 @@ def get_photos_from_rapidapi(hotel_id, num_photos) -> Union[List[types.InputMedi
 
         return photos_lst
 
-    except (requests.exceptions.ConnectionError, TypeError, KeyError, requests.exceptions.ReadTimeout) as error:
+    except (requests.exceptions.ConnectionError, TypeError, KeyError, IndexError, requests.exceptions.ConnectTimeout,
+            requests.exceptions.JSONDecodeError, requests.exceptions.ReadTimeout) as error:
         log.error('Ошибка с получением фотографий', exc_info=error)
-        return 'Ошибка'
+
+        return 'Error'
 
 
 def get_total_price(price: str, night: int) -> str:
@@ -138,16 +171,5 @@ def get_total_price(price: str, night: int) -> str:
     total = round(float(price) * night, 3)
     total_str = re.sub(r'\.', ',', str(total))
     total_str = ' '.join((total_str, 'RUB'))
+
     return total_str
-
-
-def get_distance(dist: str) -> str:
-    """
-    Функция, которая из строки с дистанцией выделяет число и переводит мили в киллометры
-    :param dist: дистанция в милях
-    """
-    distance_str = dist.split(' ')[0]
-    distance = re.sub(r',', '.', distance_str)
-    distance_fl = round(float(distance) * 1.60934, 1)
-    distance_str = ' '.join((str(distance_fl), 'км'))
-    return distance_str

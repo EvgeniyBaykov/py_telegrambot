@@ -2,11 +2,12 @@ import telebot
 from telebot import types
 from telegram_bot_calendar import DetailedTelegramCalendar
 from datetime import date
+import time
 import re
 from decouple import config
 import botrequests
 import logging.config
-from log.settings import LOGGING_CONFIG
+from settings import LOGGING_CONFIG, max_num_photos, max_num_hotels, id_sticker_time
 
 
 logging.config.dictConfig(LOGGING_CONFIG)
@@ -16,12 +17,12 @@ token_bot = config('telegram_bot_token')
 bot = telebot.TeleBot(token_bot)
 
 
-@bot.message_handler(commands=['hello_world'])
+@bot.message_handler(commands=['hello_world', 'start'])
 @bot.message_handler(func=lambda msg: msg.text.lower() == 'привет')
 def send_welcome(message: types.Message) -> None:
     """Функция - приветствие. Отправляет пользователю описание команд Бота. """
 
-    log.info('send_welcome - user_id: {user_id}'.format(user_id=message.from_user.id))
+    log.info('user_id: {user_id}'.format(user_id=message.from_user.id))
     msg = "Вас приветствует ТелеграмБот 'MyHotelBot'." \
           "\nЯ могу помочь Вам подобрать отель. Выберите команду:" \
           "\n/lowprice - поиск самых дешевых отелей в городе" \
@@ -34,6 +35,11 @@ def send_welcome(message: types.Message) -> None:
 
 @bot.message_handler(commands=['restart'])
 def restart(message):
+    """
+    Функция, которая отлавливает команду restart и переправляет пользователя
+    в функцию send_welcome
+    """
+    log.info('Выполнен restart. user_id: {user_id}'.format(user_id=message.from_user.id))
     send_welcome(message)
 
 
@@ -41,119 +47,188 @@ def restart(message):
 def command_lowprice(message: types.Message) -> None:
     """
     Функция, которая выполняет команду "lowprice".
-    Добавляет запись в БД, таблица "history_requests" (user_id, command).
+    Добавляет записи в БД: создание таблиц users и history_requests, в таблицу users добавляет нового пользователя,
+    в таблицу "history_requests" создает новый запрос, заполняет [user_id, command].
     Переправляет в функцию 'get_cities'.
+    В случае возникновения ошибки уведомляет пользователя и переправляет в функцию send_welcome.
     """
 
-    log.info('command_lowprice - user_id: {user_id}'.format(user_id=message.from_user.id))
-    try:
-        botrequests.create_tables()
-        botrequests.create_user(message.from_user.id, message.from_user.first_name,
-                                message.from_user.last_name, message.from_user.username
-                                )
-        botrequests.set_command(message.from_user.id, 'lowprice')
+    log.info('Запрос. user_id: {user_id}'.format(user_id=message.from_user.id))
 
-    except Exception:
-        bot.send_message(message.from_user.id, "Возникла неполадка c сервисом, попробуйте еще раз")
+    result_table = botrequests.create_tables()
+    result_user = botrequests.create_user(message.from_user.id, message.from_user.first_name,
+                                          message.from_user.last_name, message.from_user.username
+                                          )
+    result_command = botrequests.set_command(message.from_user.id, 'lowprice')
+    if result_table or result_user or result_command:
+        bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
         send_welcome(message)
-
-    msg = bot.send_message(message.from_user.id, "Выберите город: ")
-    bot.register_next_step_handler(msg, get_cities)
+    else:
+        msg = bot.send_message(message.from_user.id, 'Выберите город:')
+        bot.register_next_step_handler(msg, get_cities)
+        log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
 
 
 @bot.message_handler(commands=['highprice'])
 def command_highprice(message: types.Message) -> None:
     """
     Функция, которая выполняет команду "highprice".
-    Добавляет запись в БД, таблица "history_requests" (user_id, command).
-    Переправляет в функцию 'get_cities'.
+    Добавляет записи в БД: создание таблиц users и history_requests, в таблицу users добавляет нового пользователя,
+    в таблицу "history_requests" создает новый запрос, заполняет [user_id, command].
+    Запрашивает искомы город и переправляет в функцию 'get_cities'.
+    В случае возникновения ошибки уведомляет пользователя и переправляет в функцию send_welcome.
     """
 
-    log.info('command_highprice - user_id: {user_id}'.format(user_id=message.from_user.id))
-    try:
-        botrequests.create_tables()
-        botrequests.create_user(message.from_user.id, message.from_user.first_name,
-                                message.from_user.last_name, message.from_user.username
-                                )
-        botrequests.set_command(message.from_user.id, 'highprice')
+    log.info('Запрос. user_id: {user_id}'.format(user_id=message.from_user.id))
 
-    except Exception:
-        bot.send_message(message.from_user.id, "Возникла неполадка c сервисом, попробуйте еще раз")
+    result_table = botrequests.create_tables()
+    result_user = botrequests.create_user(message.from_user.id, message.from_user.first_name,
+                                          message.from_user.last_name, message.from_user.username
+                                          )
+    result_command = botrequests.set_command(message.from_user.id, 'highprice')
+    if result_table or result_user or result_command:
+        bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
         send_welcome(message)
-
-    bot.send_message(message.from_user.id, "highprice в разработке")
-    # msg = bot.send_message(message.from_user.id, "Выберите город: ")
-    # bot.register_next_step_handler(msg, get_cities)
+    else:
+        msg = bot.send_message(message.from_user.id, 'Выберите город:')
+        bot.register_next_step_handler(msg, get_cities)
+        log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
 
 
 @bot.message_handler(commands=['bestdeal'])
 def command_bestdeal(message: types.Message) -> None:
     """
     Функция, которая выполняет команду "bestdeal".
-    Добавляет запись в БД, таблица "history_requests" (user_id, command).
-    Переправляет в функцию 'get_cities'.
+    Добавляет записи в БД: создание таблиц users и history_requests, в таблицу users добавляет нового пользователя,
+    в таблицу "history_requests" создает новый запрос, заполняет [user_id, command].
+    Запрашивает у пользователя минимальную и максимальную цены за ночь и переправляет в функцию 'get_cities'.
+    В случае возникновения ошибки уведомляет пользователя и переправляет в функцию send_welcome.
     """
 
-    log.info('command_bestdeal - user_id: {user_id}'.format(user_id=message.from_user.id))
-    try:
-        botrequests.create_tables()
-        botrequests.create_user(message.from_user.id, message.from_user.first_name,
-                                message.from_user.last_name, message.from_user.username
-                                )
-        botrequests.set_command(message.from_user.id, 'bestdeal')
-
-    except Exception:
-        bot.send_message(message.from_user.id, "Возникла неполадка c сервисом, попробуйте еще раз")
+    log.info('Запрос. user_id: {user_id}'.format(user_id=message.from_user.id))
+    result_table = botrequests.create_tables()
+    result_user = botrequests.create_user(message.from_user.id, message.from_user.first_name,
+                                          message.from_user.last_name, message.from_user.username
+                                          )
+    result_command = botrequests.set_command(message.from_user.id, 'bestdeal')
+    if result_table or result_user or result_command:
+        bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
         send_welcome(message)
-
-    bot.send_message(message.from_user.id, "bestdeal в разработке")
-    # msg = bot.send_message(message.from_user.id, "Выберите город: ")
-    # bot.register_next_step_handler(msg, get_cities)
+    else:
+        msg = bot.send_message(message.from_user.id, 'Введите диапазон желаемых цен через пробел (пример: 1500 3000):')
+        bot.register_next_step_handler(msg, min_max_price)
+        log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
 
 
 @bot.message_handler(commands=['history'])
 def command_history(message: types.Message) -> None:
     """
     Функция, которая выполняет команду "history".
+    Добавляет записи в БД: создание таблиц users и history_requests, в таблицу users добавляет нового пользователя.
+    Переправляет в функцию 'show_history'.
+    В случае возникновения ошибки уведомляет пользователя и переправляет в функцию send_welcome.
     """
 
-    log.info('command_history - user_id: {user_id}'.format(user_id=message.from_user.id))
-    try:
-        botrequests.create_tables()
-        botrequests.create_user(message.from_user.id, message.from_user.first_name,
-                                message.from_user.last_name, message.from_user.username
-                                )
+    log.info('Запрос. user_id: {user_id}'.format(user_id=message.from_user.id))
 
-    except Exception:
-        bot.send_message(message.from_user.id, "Возникла неполадка c сервисом, попробуйте еще раз")
+    result_table = botrequests.create_tables()
+    result_user = botrequests.create_user(message.from_user.id, message.from_user.first_name,
+                                          message.from_user.last_name, message.from_user.username
+                                          )
+
+    if result_table or result_user:
+        bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
         send_welcome(message)
+    else:
+        show_history(message)
 
-    bot.send_message(message.from_user.id, "История в разработке")
 
-
-def get_cities(message: types.Message) -> None:
+def min_max_price(message: types.Message) -> None:
     """
-    Функция, которая получает список городов из поиска (из функции "get_cities_from_rapidapi").
-    Отправляет его в функцию "selecting_city",
-    Запрашивает у пользователя с помощью клавиатуры уточнение, какой именно город он ищет.
-    Переправляет в функцию 'selecting_city'.
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Обрабатывает полученные минимальную и максимальную цены и, если они корректные, добавляет их в БД
+    (history_requests [min_price, max_price]) и переправляет в функцию min_max_distance,
+    в противном случае сообщает об это пользователю и предлагает еще раз ввести данные.
+    В случае возникновения ошибки с БД переправляет в функцию command_bestdeal
     """
 
     if message.text == '/restart':
         restart(message)
 
     else:
-        log.info('get_cities - user_id: {user_id}'.format(user_id=message.from_user.id))
+        log.info('Получено {answer}. user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
 
-        cities_dct = botrequests.get_cities_from_rapidapi(message.text)
-        if type(cities_dct) is str:
-            bot.send_message(message.from_user.id, cities_dct)
+        result = botrequests.make_min_max_price(message)
+        if result == 'Ошибка с БД':
+            bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
+            command_bestdeal(message)
+        elif result == 'Ошибка ввода':
+            msg = bot.send_message(message.from_user.id, 'Некорректный ввод, введите еще раз')
+            bot.register_next_step_handler(msg, min_max_price)
+        else:
+            msg = bot.send_message(message.from_user.id, 'Введите диапазон расстояния, на котором находится отель '
+                                                         'от центра в км через пробел (пример: 2 5):'
+                                   )
+            bot.register_next_step_handler(msg, min_max_distance)
+
+            log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
+
+
+def min_max_distance(message: types.Message) -> None:
+    """
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Обрабатывает полученные минимальную и максимальную дистанции, если они корректные, добавляет их в БД
+    (history_requests [min_distance, max_distance]) и переправляет в функцию get_cities,
+    в противном случае сообщает об это пользователю и предлагает еще раз ввести данные.
+    В случае возникновения ошибки с БД переправляет в функцию command_bestdeal
+    """
+
+    if message.text == '/restart':
+        restart(message)
+
+    log.info('Получено {answer} user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
+
+    result = botrequests.make_min_max_distance(message)
+    if result == 'Ошибка с БД':
+        bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
+        command_bestdeal(message)
+    elif result == 'Ошибка ввода':
+        msg = bot.send_message(message.from_user.id, 'Некорректный ввод, введите еще раз')
+        bot.register_next_step_handler(msg, min_max_distance)
+    else:
+        msg = bot.send_message(message.from_user.id, 'Выберите город:')
+        bot.register_next_step_handler(msg, get_cities)
+
+        log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
+
+
+def get_cities(message: types.Message) -> None:
+    """
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Получает список городов из функции get_cities_from_rapidapi и отправляет его в функцию selecting_city,
+    Запрашивает у пользователя с помощью клавиатуры уточнение, какой именно город он ищет.
+    Если ничего не найдено, сообщает пользователю и переправляет его в функцию get_cities.
+    В случае возникновения ошибки с API переправляет в функцию command_bestdeal
+    """
+
+    if message.text == '/restart':
+        restart(message)
+
+    else:
+        log.info('Получено {answer}. user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
+
+        cities_dct = botrequests.get_cities_from_rapidapi(message.text, message.from_user.id)
+        if cities_dct == 'Error':
+            bot.send_message(message.from_user.id, 'Технические неполадки с сайтом. Повторите запрос!')
             send_welcome(message)
+        elif cities_dct == 'Null':
+            msg = bot.send_message(message.from_user.id, 'Ничего не найдено. Повторите запрос!')
+            bot.register_next_step_handler(msg, get_cities)
 
         else:
-            id_request = botrequests.get_last_request_id(message.from_user.id)
-            botrequests.set_city(str(cities_dct)[1:-1], id_request)
-
             cities_lst = cities_dct.values()
             cities_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
 
@@ -162,37 +237,41 @@ def get_cities(message: types.Message) -> None:
             msg = bot.send_message(message.from_user.id, 'Уточните, пожалуйста:', reply_markup=cities_markup)
             bot.register_next_step_handler(msg, selecting_city)
 
+            log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
+
 
 def selecting_city(message: types.Message) -> None:
     """
-    Функция, в которой подтверждается город, записывает его id. Добавляет город в БД,
-    таблица "history_requests" (request). Даты запрашиваются через календарь.
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Записывает id и название полученного города в БД (history_requests [id_city, city]).
+    Запрашивается дату заезда при помощи клавиатуры - календарь.
     """
 
     if message.text == '/restart':
         restart(message)
 
     else:
-        log.info('selecting_city - user_id: {user_id}'.format(user_id=message.from_user.id))
-        result = botrequests.get_last_request(message.from_user.id)
-        id_request, city, check_in = result
-
+        log.info('Получено {answer} user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
+        city = botrequests.get_city(message.from_user.id)
         pattern_city = r"'(\d+)': '([^']+)'"
         cities_lst = re.findall(pattern_city, city)
 
         for i_city in cities_lst:
             if i_city[1] == message.text:
-                botrequests.set_id_city(i_city[0], id_request)
-                botrequests.set_city(i_city[1], id_request)
+                botrequests.set_id_city(i_city[0], message.from_user.id)
+                botrequests.set_city(i_city[1], message.from_user.id)
+                break
 
         message_date = 'Выберите дату заезда'
+        log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
         calendar(message, message_date)
 
 
 def calendar(message: types.Message, message_date: str) -> None:
     """Функция - клавиатура-календарь"""
 
-    log.info('calendar - user_id: {user_id}'.format(user_id=message.from_user.id))
+    log.info('Начало работы. user_id: {user_id}'.format(user_id=message.from_user.id))
     calendar_markup, step = DetailedTelegramCalendar(one_time_keyboard=True, min_date=date.today(), locale='ru').build()
     bot.send_message(message.from_user.id,
                      message_date,
@@ -200,9 +279,9 @@ def calendar(message: types.Message, message_date: str) -> None:
 
 
 @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
-def callback_date(cal) -> None:  # Не нахожу, что за тип у переменной
+def callback_date(cal) -> None:                                   # Не нахожу, что за тип у переменной
     """
-    Функция, собирающая даты заезда и выезда через календарь.
+    Функция, получает даты заезда и выезда, записывает их в БД (history_requests [check_in, check_out]).
     После полного выполнения переправляет в функцию 'number_hotels'.
     """
 
@@ -211,7 +290,7 @@ def callback_date(cal) -> None:  # Не нахожу, что за тип у пе
 
     if check_in:
         message_date = 'Выберите дату выезда'
-        min_date_in_calendar = botrequests.f_date(check_in)
+        min_date_in_calendar = botrequests.next_day(check_in)
         answer, key, step = DetailedTelegramCalendar(min_date=min_date_in_calendar, locale='ru').process(cal.data)
     else:
         message_date = 'Выберите дату заезда'
@@ -226,11 +305,14 @@ def callback_date(cal) -> None:  # Не нахожу, что за тип у пе
         if check_in:
             botrequests.set_check_out(answer, request_id)
 
-            hotels_markup = botrequests.create_markup_hotels()
-            msg = bot.send_message(cal.message.chat.id, 'Выберите количество отелей (max=9):',
+            hotels_markup = botrequests.markup_hotels()
+            msg = bot.send_message(cal.message.chat.id,
+                                   'Выберите количество отелей (max={num}):'.format(num=max_num_hotels),
                                    reply_markup=hotels_markup
                                    )
             bot.register_next_step_handler(msg, number_hotels)
+
+            log.info('Даты добавлены. user_id: {user_id}'.format(user_id=cal.message.chat.id))
         else:
             botrequests.set_check_in(answer, request_id)
             calendar(cal, 'Выберите дату выезда:')
@@ -238,8 +320,10 @@ def callback_date(cal) -> None:  # Не нахожу, что за тип у пе
 
 def number_hotels(message: types.Message) -> None:
     """
-    Функция которая добавляет количество отелей в БД, спрашивает у польщователя, нужны ли фотографии и
-    направляет в функцию 'ask_photos'.
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Проверяет полученное число отелей, если корректно, то добавляет в БД (history_requests [num_hotels]),
+    спрашивает у пользователя, нужны ли фотографии и направляет в функцию 'ask_photos'.
     В случае некорректного ответа, переспрашивает о количестве отелей.
     """
 
@@ -247,30 +331,42 @@ def number_hotels(message: types.Message) -> None:
         restart(message)
 
     else:
-        log.info('number_hotels - user_id: {user_id}'.format(user_id=message.from_user.id))
+        log.info('Получено {answer}. user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
 
-        if 0 < int(message.text) < 10:
-            request_id = botrequests.get_last_request_id(message.from_user.id)
-            botrequests.set_num_hotels(message.text, request_id)
+        result = botrequests.set_num_hotels(message.from_user.id, message.text)
 
-            photo_markup = botrequests.create_markup_yes_no()
-            msg = bot.send_message(message.from_user.id, 'Нужны фотографии?', reply_markup=photo_markup)
-            bot.register_next_step_handler(msg, ask_photos)
-
-        else:
-            hotels_markup = botrequests.create_markup_hotels()
-            msg = bot.send_message(message.from_user.id, 'Введен некорректный ответ. '
-                                                         '\nВыберите количество отелей на клавиатуре (max=9):',
+        if result == 'ошибка в БД':
+            bot.send_message(message.from_user.id, 'Технические неполадки с сервисом')
+            hotels_markup = botrequests.markup_hotels()
+            msg = bot.send_message(message.from_user.id,
+                                   'Выберите количество отелей (max={num}):'.format(num=max_num_hotels),
                                    reply_markup=hotels_markup
                                    )
             bot.register_next_step_handler(msg, number_hotels)
+
+        elif result == 'Неверный ввод':
+            hotels_markup = botrequests.markup_hotels()
+            msg = bot.send_message(message.from_user.id,
+                                   'Введен некорректный ответ. \nВыберите количество отелей на клавиатуре '
+                                   '(max={num}):'.format(num=max_num_hotels),
+                                   reply_markup=hotels_markup
+                                   )
+            bot.register_next_step_handler(msg, number_hotels)
+
+        else:
+            photo_markup = botrequests.markup_yes_no()
+            msg = bot.send_message(message.from_user.id, 'Нужны фотографии?', reply_markup=photo_markup)
             bot.register_next_step_handler(msg, ask_photos)
+
+            log.info('Отработал успешно. user_id: {user_id}'.format(user_id=message.from_user.id))
 
 
 def ask_photos(message: types.Message) -> None:
     """
-    Функция, которая переправляет в функцию 'ask_num_photos', если фотографии не нужны.
-    Если фотографии, нужны, то спрашивает у польщователя сколько (max=10) и направляет в функцию 'ask_num_photos'.
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Если получен ответ "Нет" переправляет в функцию output.
+    Если получен ответ "Да", то запрашивает у пользователя количество и направляет в функцию ask_num_photos.
     В случае некорректного ответа, переспрашивает о необходимости фотографий.
     """
 
@@ -278,17 +374,19 @@ def ask_photos(message: types.Message) -> None:
         restart(message)
 
     else:
-        log.info('ask_photos - user_id: {user_id}'.format(user_id=message.from_user.id))
-
+        log.info('Получено {answer}. user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
         if message.text.lower() == 'нет':
-            lowprice_output(message)
+            request_id = botrequests.get_last_request_id(message.from_user.id)
+            output(message.from_user.id, request_id)
 
         elif message.text.lower() == 'да':
-            msg = bot.send_message(message.from_user.id, 'Введите количество(max=6):')
+            photos_markup = botrequests.markup_photos()
+            msg = bot.send_message(message.from_user.id, 'Введите количество(max={num}):'.format(num=max_num_photos),
+                                   reply_markup=photos_markup)
             bot.register_next_step_handler(msg, ask_num_photos)
 
         else:
-            photo_markup = botrequests.create_markup_yes_no()
+            photo_markup = botrequests.markup_yes_no()
             msg = bot.send_message(message.from_user.id, 'Введен некорректный ответ. '
                                                          '\nВыберите ответ на клавиатуре:', reply_markup=photo_markup)
             bot.register_next_step_handler(msg, ask_photos)
@@ -296,7 +394,10 @@ def ask_photos(message: types.Message) -> None:
 
 def ask_num_photos(message: types.Message) -> None:
     """
-    Функция, которая записывает в БД количество фотографий.
+    Функция, которая в случае получения текста "/restart" переправляет в функцию send_welcome.
+    Иначе
+    Проверяет количество фотографий, если корректно, то записывает в БД (history_requests [photos]) и
+    переправляет в функцию output.
     В случае некорректного ответа, переспрашивает о количестве фотографий.
     """
 
@@ -304,46 +405,115 @@ def ask_num_photos(message: types.Message) -> None:
         restart(message)
 
     else:
-        log.info('ask_num_photos - user_id: {user_id}'.format(user_id=message.from_user.id))
+        log.info('Получено {answer}. user_id: {user_id}'.format(answer=message.text, user_id=message.from_user.id))
 
-        if 0 < int(message.text) < 7:
-            request_id = botrequests.get_last_request_id(message.from_user.id)
-            botrequests.set_num_photos(message.text, request_id)
-            lowprice_output(message)
+        request_id = botrequests.get_last_request_id(message.from_user.id)
+        result = botrequests.set_num_photos(message.text, request_id)
+
+        if result == 'ошибка в БД':
+            bot.send_message(message.from_user.id, 'Технические неполадки с сервисом')
+            photos_markup = botrequests.markup_photos()
+            msg = bot.send_message(message.from_user.id, 'Введите количество(max={num}):'.format(num=max_num_photos),
+                                   reply_markup=photos_markup)
+            bot.register_next_step_handler(msg, ask_num_photos)
+
+        elif result == 'Неверный ввод':
+            photos_markup = botrequests.markup_photos()
+            msg = bot.send_message(message.from_user.id, 'Введите количество(max={num}):'.format(num=max_num_photos),
+                                   reply_markup=photos_markup)
+            bot.register_next_step_handler(msg, ask_num_photos)
+
         else:
-            photo_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-            photo_markup.add(types.KeyboardButton('Да'), types.KeyboardButton('Нет'))
-            msg = bot.send_message(message.from_user.id, 'Введён некорректный ответ.'
-                                                         '\nХотите ввести количество фотографий ещё раз?',
-                                   reply_markup=photo_markup
-                                   )
-            bot.register_next_step_handler(msg, ask_photos)
+            output(message.from_user.id, request_id)
 
 
-def lowprice_output(message: types.Message) -> None:
-    """ Функция, которая отправляет пользователю готовый ответ на запрос. """
+def output(user_id: int, request_id: int) -> None:
+    """
+    Функция, которая отправляет пользователю готовый ответ на запрос.
+    В случае ошибки сообщает об этом пользователю и предлагает повторить запрос из истории
+    """
 
-    log.info('lowprice_output - user_id: {user_id}'.format(user_id=message.from_user.id))
+    log.info('Начало работы. user_id: {user_id}'.format(user_id=user_id))
 
-    bot.send_message(message.from_user.id, 'Поиск займет несколько секунд, пожалуйста, подождите!')
-    result = botrequests.get_request_lowprice(message.from_user.id)
-    hotels_dct = botrequests.get_hotels_from_rapidapi(result)
+    bot.send_sticker(user_id, id_sticker_time)
+    bot.send_message(user_id, 'Поиск займет несколько секунд, пожалуйста, подождите!')
+    command = botrequests.get_command(request_id)
+
+    if command == 'lowprice':
+        hotels_dct = botrequests.get_hotels_from_rapidapi_lowprice(user_id, request_id)
+    elif command == 'highprice':
+        hotels_dct = botrequests.get_hotels_from_rapidapi_highprice(user_id, request_id)
+    else:
+        hotels_dct = botrequests.get_hotels_from_rapidapi_bestdeal(user_id, request_id)
+
     if type(hotels_dct) is str:
-        bot.send_message(message.from_user.id, hotels_dct)
+        bot.send_message(user_id, hotels_dct)
+
+    else:
+        try:
+            for hotel in hotels_dct.values():
+                if hotel.get('photos'):
+                    media_gr = hotel['photos']
+                    bot.send_media_group(user_id, media_gr, disable_notification=True)
+
+                keyboard = botrequests.markup_url(hotel['url'])
+                msg_lst = [': '.join((k, str(v))) for k, v in hotel.items() if k != 'photos' and k != 'url']
+                msg = '\n'.join(msg_lst)
+                bot.send_message(user_id, msg, reply_markup=keyboard)
+                time.sleep(1)
+
+            log.info('Запрос отправлен пользователю. user_id: {user_id}'.format(user_id=user_id))
+        except Exception as err:
+            log.error('Имя ошибки: {}'.format(err))
+            bot.send_message(user_id, 'Неполадки с телеграмом')
+            bot.send_message(user_id, 'Вы можете повторить свой запрос из истории')
+
+
+def show_history(message: types.Message) -> None:
+    """
+    Функция, которая получает последние запросы пользователя. Если запросов не было, то сообщает об этом пользователю
+    и переправляет в функцию send_welcome.
+    Иначе отправляет пользователю клавиатуру с последними запросами
+    """
+
+    result = botrequests.get_user_request(message.from_user.id)
+    if not result:
+        log.info('Список запросов пуст. user_id: {user_id}'.format(user_id=message.from_user.id))
+        bot.send_message(message.from_user.id, 'Вы еще не сделали ниодного запроса.\nДавайте это исправим!')
         send_welcome(message)
 
     else:
-        botrequests.set_request(hotels_dct, message.from_user.id)
+        for i_req in result:
+            keyboard = botrequests.markup_repeat_request(str(i_req[0]))
+            output_text = botrequests.history_txt(i_req)
+            bot.send_message(message.from_user.id, output_text, reply_markup=keyboard, disable_web_page_preview=True)
 
-        for hotel in hotels_dct.values():
-            msg_lst = [': '.join((k, str(v))) for k, v in hotel.items() if k != 'photos']
-            msg = '\n'.join(msg_lst)
-            bot.send_message(message.from_user.id, msg)
-            if result[4]:
-                media_gr = hotel['photos']
-                bot.send_media_group(message.from_user.id, media_gr)
+            log.info('отправил историю. user_id: {user_id}'.format(user_id=message.from_user.id))
 
-        log.info('lowprice_output has been successful  - user_id: {user_id}'.format(user_id=message.from_user.id))
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call) -> None:
+    """
+    Функция получает в ответе пользователя id запроса и отправляет его в функцию output.
+    Иначе предлагает пользователю нажать на необходимый запрос.
+    """
+
+    log.info('Id запрашиваемого запроса {answer} от пользователя {user_id}'.format(
+        answer=call.data, user_id=call.message.chat.id)
+    )
+    if call.data:
+        output(call.message.chat.id, int(call.data))
+    else:
+        bot.send_message(call.message.chat.id, 'Нажмите на интересующий вас запрос')
+
+
+@bot.message_handler(content_types=['text'])
+def bot_help(message: types.Message):
+
+    if message.text.lower() != 'привет' or '/hello_world' or '/lowprice' or \
+            '/highprice' or '/bestdeal' or '/history' or '/restart':
+        msg = 'Чтобы начать поиск сайтов напишите "привет" или выберите одну из команд в меню Бота'
+        bot.send_message(message.from_user.id, msg)
 
 
 bot.infinity_polling()

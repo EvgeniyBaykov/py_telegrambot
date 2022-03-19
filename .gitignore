@@ -1,11 +1,7 @@
 .env
 *.log
-log/
 env/
 .git/
 .idea/
 __pycache__/
-test_requests.py
-test.py
 users.db
-
