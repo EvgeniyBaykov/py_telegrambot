@@ -1,10 +1,10 @@
+from datetime import date, datetime, timedelta
+import emoji
+import logging
+import re
 from telebot import types
 import time
-from datetime import date, datetime, timedelta
-import re
-import logging
-from typing import Tuple, Dict, Union
-import emoji
+from typing import Dict, List, Tuple, Union
 
 __all__ = ['f_date', 'num_nights', 'markup_hotels', 'markup_photos', 'markup_yes_no', 'markup_url', 'next_day',
            'markup_repeat_request', 'history_txt', 'create_request_str']
@@ -18,9 +18,9 @@ def f_date(date_str: str) -> date:
     :param date_str: дата
     """
 
-    date_str = ' '.join(date_str.split('-'))
-    date_tpl = time.strptime(date_str, '%Y %m %d')
-    my_date = date(date_tpl[0], date_tpl[1], date_tpl[2])
+    date_str: str = ' '.join(date_str.split('-'))
+    date_tpl: time = time.strptime(date_str, '%Y %m %d')
+    my_date: date = date(date_tpl[0], date_tpl[1], date_tpl[2])
 
     return my_date
 
@@ -31,10 +31,10 @@ def next_day(date_str: str) -> date:
     :param date_str: дата
     """
 
-    date_str = ' '.join(date_str.split('-'))
-    date_tpl = datetime.strptime(date_str, '%Y %m %d')
-    next_date_tpl = datetime.timetuple(date_tpl + timedelta(1))
-    next_date = date(next_date_tpl[0], next_date_tpl[1], next_date_tpl[2])
+    date_str: str = ' '.join(date_str.split('-'))
+    date_tpl: datetime = datetime.strptime(date_str, '%Y %m %d')
+    next_date_tpl: time = datetime.timetuple(date_tpl + timedelta(1))
+    next_date: date = date(next_date_tpl[0], next_date_tpl[1], next_date_tpl[2])
 
     return next_date
 
@@ -46,9 +46,9 @@ def num_nights(date_1: str, date_2: str) -> int:
     :param date_2: дата выезда
     """
 
-    num_days = str(f_date(date_2) - f_date(date_1))
-    pattern_days = r'\b\d+'
-    nights = int(re.match(pattern_days, num_days)[0])
+    num_days: str = str(f_date(date_2) - f_date(date_1))
+    pattern_days: str = r'\b\d+'
+    nights: int = int(re.match(pattern_days, num_days)[0])
 
     return nights
 
@@ -166,10 +166,10 @@ def create_request_str(req_dct: Dict[int, dict[Union[str, str]]]) -> str:
     try:
         request_lst = list()
         for hotel in req_dct.values():
-            msg_lst = [': '.join((k, str(v))) for k, v in hotel.items() if k != 'photos']
-            msg = '\n'.join(msg_lst)
+            msg_lst: List[str] = [': '.join((k, str(v))) for k, v in hotel.items() if k != 'photos']
+            msg: str = '\n'.join(msg_lst)
             request_lst.append(msg)
-        request_str = '\n'.join(request_lst)
+        request_str: str = '\n'.join(request_lst)
         return request_str
 
     except (ValueError, KeyError) as error:

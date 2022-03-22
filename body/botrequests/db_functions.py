@@ -1,10 +1,10 @@
+from body.botrequests.history import create_request_str
+from datetime import datetime
+import logging
+from settings import num_history_requests, max_num_hotels, max_num_photos
 import sqlite3
 from telebot import types
 from typing import Tuple, Dict, List, Union, Optional
-from datetime import datetime
-import logging
-from .history import create_request_str
-from settings import num_history_requests, max_num_hotels, max_num_photos
 
 __all__ = ['create_tables', 'create_user', 'set_command', 'get_command', 'get_last_request_id',
            'set_city', 'get_city', 'get_last_request', 'set_id_city', 'set_check_in', 'set_check_out',
@@ -123,7 +123,7 @@ def get_command(request_id: int) -> str:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
         cur.execute("SELECT command FROM history_requests WHERE request_id = ?;", (request_id,))
-        command = cur.fetchone()[0]
+        command: str = cur.fetchone()[0]
         return command
 
     except sqlite3.DatabaseError as error:
@@ -146,7 +146,7 @@ def get_last_request_id(user_id: int) -> int:
                     "ORDER BY request_id DESC LIMIT 1;", (user_id,)
                     )
         req = cur.fetchone()
-        id_request = req[0]
+        id_request: int = req[0]
         return id_request
 
     except sqlite3.DatabaseError as error:
@@ -166,7 +166,7 @@ def set_city(city: str, user_id: int) -> None:
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        id_request = get_last_request_id(user_id)
+        id_request: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET city = ? WHERE request_id = ?;", (city, id_request))
         conn.commit()
 
@@ -189,8 +189,8 @@ def get_city(user_id: int) -> str:
         cur.execute("SELECT city FROM history_requests WHERE user_id = ? "
                     "ORDER BY request_id DESC LIMIT 1;", (user_id,)
                     )
-        command = cur.fetchone()[0]
-        return command
+        city: str = cur.fetchone()[0]
+        return city
 
     except sqlite3.DatabaseError as error:
         log.error('get_city has not been successful', exc_info=error)
@@ -199,7 +199,7 @@ def get_city(user_id: int) -> str:
             conn.close()
 
 
-def get_last_request(user_id: int) -> Tuple:  # Пытался вот так заполнить, но ничего не получилось Tuple[Optional[int, str]]
+def get_last_request(user_id: int) -> Tuple[Union[int, str]]:
     """
     Функция, которая возвращает из последнего запроса пользователя значения "request_id", "city", "check_in"
     :param user_id: id пользователя
@@ -212,7 +212,7 @@ def get_last_request(user_id: int) -> Tuple:  # Пытался вот так з�
                     "WHERE user_id = ? "
                     "ORDER BY request_id DESC LIMIT 1;", (user_id,)
                     )
-        result = cur.fetchone()
+        result: Tuple[Union[int, str]] = cur.fetchone()
 
         return result
 
@@ -233,7 +233,7 @@ def set_id_city(id_city: str, user_id: int) -> None:
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        id_request = get_last_request_id(user_id)
+        id_request: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET id_city = ? WHERE request_id = ?;",
                     (id_city, id_request)
                     )
@@ -300,13 +300,15 @@ def set_num_hotels(user_id: int, num_hotels: str) -> Optional[str]:
     try:
         conn = sqlite3.connect('users.db')
         conn = sqlite3.connect('users.db')
-        request_id = get_last_request_id(user_id)
+        request_id: int = get_last_request_id(user_id)
         if 0 < int(num_hotels) < max_num_hotels + 1:
             cur = conn.cursor()
             cur.execute("UPDATE history_requests SET num_hotels = ? WHERE request_id = ?;",
                         (num_hotels, request_id)
                         )
             conn.commit()
+        else:
+            raise ValueError
 
     except sqlite3.DatabaseError as error:
         log.error('set_num_hotels has not been successful', exc_info=error)
@@ -334,6 +336,8 @@ def set_num_photos(num_photos: str, request_id: int) -> Optional[str]:
                         (num_photos, request_id)
                         )
             conn.commit()
+        else:
+            raise ValueError
 
     except sqlite3.DatabaseError as error:
         log.error('set_num_photos has not been successful', exc_info=error)
@@ -356,8 +360,8 @@ def set_request(user_id: int, req_dct: Dict[int, dict[Union[str, str]]]) -> None
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        request_str = create_request_str(req_dct)
-        request_id = get_last_request_id(user_id)
+        request_str: str = create_request_str(req_dct)
+        request_id: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET request = ? WHERE request_id = ?;",
                     (request_str, request_id)
                     )
@@ -383,7 +387,7 @@ def get_request(user_id: int) -> str:
         cur.execute("SELECT request FROM history_requests "
                     "WHERE user_id = ? ORDER BY request_id DESC LIMIT 1;", (user_id,)
                     )
-        result = cur.fetchone()
+        result: str = cur.fetchone()
         return result
 
     except sqlite3.DatabaseError as error:
@@ -411,7 +415,7 @@ def make_min_max_price(message: types.Message) -> Union[str, Tuple[int, int]]:
         if result_min_price or result_max_price:
             return 'Ошибка с БД'
 
-    except ValueError as error:
+    except (ValueError, IndexError) as error:
         log.error('Неверный ввод диапазона цен', exc_info=error)
         return 'Ошибка ввода'
 
@@ -429,7 +433,7 @@ def set_min_price(min_price: int, user_id:int) -> Optional[bool]:
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        id_request = get_last_request_id(user_id)
+        id_request: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET min_price = ? WHERE request_id = ?;", (str(min_price), id_request))
         conn.commit()
 
@@ -451,7 +455,7 @@ def set_max_price(max_price: int, user_id: int) -> Optional[bool]:
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        id_request = get_last_request_id(user_id)
+        id_request: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET max_price = ? WHERE request_id = ?;", (str(max_price), id_request))
         conn.commit()
 
@@ -481,7 +485,7 @@ def make_min_max_distance(message: types.Message) -> Union[str, Tuple[int, int]]
         if result_min_distance or result_max_distance:
             return 'Ошибка с БД'
 
-    except ValueError as error:
+    except (ValueError, IndexError) as error:
         log.error('Неверный ввод диапазона цен', exc_info=error)
         return 'Ошибка ввода'
 
@@ -499,7 +503,7 @@ def set_min_distance(min_distance: int, user_id: int) -> Optional[bool]:
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        id_request = get_last_request_id(user_id)
+        id_request: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET min_distance = ? WHERE request_id = ?;", (str(min_distance), id_request))
         conn.commit()
 
@@ -521,7 +525,7 @@ def set_max_distance(max_distance: int, user_id: int) -> Optional[bool]:
     try:
         conn = sqlite3.connect('users.db')
         cur = conn.cursor()
-        id_request = get_last_request_id(user_id)
+        id_request: int = get_last_request_id(user_id)
         cur.execute("UPDATE history_requests SET max_distance = ? WHERE request_id = ?;",
                     (str(max_distance), id_request)
                     )
@@ -535,7 +539,7 @@ def set_max_distance(max_distance: int, user_id: int) -> Optional[bool]:
             conn.close()
 
 
-def get_request_low_high(request_id: int) -> Tuple:
+def get_request_low_high(request_id: int) -> Tuple[str]:
     """
     Функция, которая возвращает последний запрос пользователя для команд lowprice и highprice.
     :param request_id: id запроса
@@ -557,7 +561,7 @@ def get_request_low_high(request_id: int) -> Tuple:
             conn.close()
 
 
-def get_request_bestdeal(request_id: int) -> Tuple:
+def get_request_bestdeal(request_id: int) -> Tuple[str]:
     """
     Функция, которая возвращает последний запрос пользователя для команды bestdeal.
     :param request_id: id запроса
@@ -581,7 +585,7 @@ def get_request_bestdeal(request_id: int) -> Tuple:
             conn.close()
 
 
-def get_user_request(user_id: int) -> List[Tuple]:
+def get_user_request(user_id: int) -> List[Tuple[Union[int, str]]]:
     """
     Возвращает все запросы пользователя, у которых заполнен столбец history_requests [request] в обратном порядке
     :param user_id: id пользователя
@@ -593,7 +597,7 @@ def get_user_request(user_id: int) -> List[Tuple]:
         cur.execute("SELECT * FROM history_requests WHERE user_id = ? and request IS NOT NULL "
                     "ORDER BY request_id DESC;", (user_id,)
                     )
-        result = cur.fetchmany(num_history_requests)
+        result: List[Tuple[Union[int, str]]] = cur.fetchmany(num_history_requests)
         return result
 
     except sqlite3.DatabaseError as error:

@@ -1,12 +1,11 @@
-from telebot import types
-import requests
-from decouple import config
-from typing import Dict, List, Union
+from body.botrequests.db_functions import get_request_low_high, set_request
+from body.botrequests.history import num_nights
+from body.botrequests.lowprice import get_total_price
 import logging
-from .history import num_nights
-from .lowprice import get_total_price
-from .db_functions import get_request_low_high, set_request
-from settings import photo_size
+import requests
+from settings import photo_size, headers_request
+from telebot import types
+from typing import Dict, List, Union
 
 __all__ = ['get_hotels_from_rapidapi_highprice']
 
@@ -24,10 +23,7 @@ def get_hotels_from_rapidapi_highprice(user_id, request_id) -> Union[Dict[int, d
     """
 
     url = "https://hotels4.p.rapidapi.com/properties/list"
-    headers = {
-        'x-rapidapi-host': "hotels4.p.rapidapi.com",
-        'x-rapidapi-key': config('x-rapidapi-key')
-    }
+    headers: Dict[str: str] = headers_request
 
     id_city, check_in, check_out, num_hotels, photos, request = get_request_low_high(request_id)
 
@@ -41,33 +37,37 @@ def get_hotels_from_rapidapi_highprice(user_id, request_id) -> Union[Dict[int, d
         log.info('user_id: {user_id}. Получен ответ: {res}.'.format(user_id=user_id, res=response))
 
         hotel_dct = dict()
-        nights = num_nights(check_in, check_out)
-        hotels_lst = response['data']['body']['searchResults']['results']
+        nights: int = num_nights(check_in, check_out)
+        hotels_lst: List[Dict[int: Union[str, dict[str: str]]]] = response['data']['body']['searchResults']['results']
         if not hotels_lst:
             return 'По вашему запросу ничего не найдено.'
 
         for i_hotel in hotels_lst:
             i_hotel_dct = dict()
-            price = i_hotel['ratePlan']['price']['current']
+            price: str = i_hotel['ratePlan']['price']['current']
 
-            i_hotel_dct['Название отеля'] = i_hotel['name']
+            i_hotel_dct['Название отеля']: str = i_hotel['name']
             try:
-                i_hotel_dct['Адрес'] = i_hotel['address']['streetAddress']
+                i_hotel_dct['Адрес']: str = i_hotel['address']['streetAddress']
             except KeyError:
-                i_hotel_dct['Адрес'] = 'None'
-            i_hotel_dct['Расстояние до центра'] = i_hotel['landmarks'][0]['distance']
-            i_hotel_dct['Цена за ночь'] = i_hotel['ratePlan']['price']['current']
-            i_hotel_dct[f'Цена за {nights} ночей'] = get_total_price(price, nights)
-            i_hotel_dct['url'] = ''.join(('https://hotels.com/ho', str(i_hotel['id'])))
+                i_hotel_dct['Адрес']: str = 'None'
+            i_hotel_dct['Расстояние до центра']: str = i_hotel['landmarks'][0]['distance']
+            i_hotel_dct['Цена за ночь']: str = price
+            i_hotel_dct[f'Цена за {nights} ночей']: str = get_total_price(price, nights)
+            i_hotel_dct['url']: str = ''.join(('https://hotels.com/ho', str(i_hotel['id'])))
 
             if photos:
-                photo_lst = get_photos_from_rapidapi_high(i_hotel['id'], photos)
+                photo_lst: Union[List[types.InputMediaPhoto], str] = \
+                    get_photos_from_rapidapi_high(i_hotel['id'], photos)
 
                 if photo_lst is str:
                     raise requests.exceptions.ConnectionError
 
-                i_hotel_dct['photos'] = photo_lst
+                i_hotel_dct['photos']: List[types.InputMediaPhoto] = photo_lst
             hotel_dct[i_hotel['id']]: int = i_hotel_dct
+
+        if len(hotel_dct) == 0:
+            return 'Ничего не найдено'
 
         if not request:
             set_request(user_id, hotel_dct, )
@@ -93,18 +93,15 @@ def get_photos_from_rapidapi_high(hotel_id, num_photos) -> Union[List[types.Inpu
 
     querystring = {"id": str(hotel_id)}
 
-    headers = {
-        'x-rapidapi-host': "hotels4.p.rapidapi.com",
-        'x-rapidapi-key': config('x-rapidapi-key')
-    }
+    headers: Dict[str: str] = headers_request
 
     try:
         response = requests.request("GET", url, headers=headers, params=querystring, timeout=15).json()
-        size = photo_size
+        size: str = photo_size
         photos_lst = list()
         for i_photo in range(int(num_photos)):
-            url_photo = response['hotelImages'][i_photo]['baseUrl'].format(size=size)
-            photo = types.InputMediaPhoto(url_photo)
+            url_photo: str = response['hotelImages'][i_photo]['baseUrl'].format(size=size)
+            photo: types.InputMediaPhoto = types.InputMediaPhoto(url_photo)
             photos_lst.append(photo)
 
         return photos_lst
