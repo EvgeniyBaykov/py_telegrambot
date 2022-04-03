@@ -1,11 +1,14 @@
+import logging
+from typing import Dict, List, Union
+import sqlite3
+
+import requests
+from telebot import types
+
 from body.botrequests.db_functions import get_request_low_high, set_request
 from body.botrequests.history import num_nights
 from body.botrequests.lowprice import get_total_price
-import logging
-import requests
 from settings import photo_size, headers_request
-from telebot import types
-from typing import Dict, List, Union
 
 __all__ = ['get_hotels_from_rapidapi_highprice']
 
@@ -25,7 +28,10 @@ def get_hotels_from_rapidapi_highprice(user_id, request_id) -> Union[Dict[int, d
     url = "https://hotels4.p.rapidapi.com/properties/list"
     headers: Dict[str: str] = headers_request
 
-    id_city, check_in, check_out, num_hotels, photos, request = get_request_low_high(request_id)
+    param_request = get_request_low_high(request_id)
+    if type(param_request) is str:
+        raise sqlite3.DatabaseError
+    id_city, check_in, check_out, num_hotels, photos, request = param_request
 
     querystring_hotel = {"destinationId": id_city, "checkIn": check_in, "checkOut": check_out,
                          "pageSize": num_hotels, "pageNumber": "1", "adults1": "1", "sortOrder": "PRICE_HIGHEST_FIRST",
@@ -79,6 +85,11 @@ def get_hotels_from_rapidapi_highprice(user_id, request_id) -> Union[Dict[int, d
         log.error('Ошибка с получением отелей. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
 
         return 'Технические неполадки с сайтом, попробуйте еще раз.'
+
+    except sqlite3.DatabaseError as error:
+        log.error('Ошибка с БД. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
+
+        return 'Техническая неполадка. Попробуйте еще раз!'
 
 
 def get_photos_from_rapidapi_high(hotel_id, num_photos) -> Union[List[types.InputMediaPhoto], str]:

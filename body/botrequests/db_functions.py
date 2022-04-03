@@ -1,15 +1,33 @@
-from body.botrequests.history import create_request_str
 from datetime import datetime
 import logging
-from settings import num_history_requests, max_num_hotels, max_num_photos
-import sqlite3
-from telebot import types
 from typing import Tuple, Dict, List, Union, Optional
 
-__all__ = ['create_tables', 'create_user', 'set_command', 'get_command', 'get_last_request_id',
-           'set_city', 'get_city', 'get_last_request', 'set_id_city', 'set_check_in', 'set_check_out',
-           'set_num_hotels', 'set_num_photos', 'set_request', 'set_min_price', 'set_max_price',
-           'make_min_max_price', 'make_min_max_distance', 'get_request_low_high', 'get_request_bestdeal',
+import sqlite3
+from telebot import types
+
+from body.botrequests.history import create_request_str
+from settings import num_history_requests, max_num_hotels, max_num_photos
+
+__all__ = ['create_tables',
+           'create_user',
+           'set_command',
+           'get_command',
+           'get_last_request_id',
+           'set_city',
+           'get_city',
+           'get_last_request',
+           'set_id_city',
+           'set_check_in',
+           'set_check_out',
+           'set_num_hotels',
+           'set_num_photos',
+           'set_request',
+           'set_min_price',
+           'set_max_price',
+           'make_min_max_price',
+           'make_min_max_distance',
+           'get_request_low_high',
+           'get_request_bestdeal',
            'get_user_request'
            ]
 
@@ -55,8 +73,7 @@ def create_tables() -> Optional[str]:
         log.error('create_tables has not been successful', exc_info=error)
         return 'Ошибка в create_tables'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def create_user(user_id: int, first_name: str, last_name: str, username: str) -> Optional[str]:
@@ -82,8 +99,7 @@ def create_user(user_id: int, first_name: str, last_name: str, username: str) ->
         log.error('create_user has not been successful', exc_info=error)
         return 'Ошибка в create_user'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_command(user_id: int, command: str) -> Optional[str]:
@@ -109,8 +125,7 @@ def set_command(user_id: int, command: str) -> Optional[str]:
         log.error('set_command has not been successful', exc_info=error)
         return 'Ошибка в set_command'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def get_command(request_id: int) -> str:
@@ -129,8 +144,7 @@ def get_command(request_id: int) -> str:
     except sqlite3.DatabaseError as error:
         log.error('get_last_request_id has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def get_last_request_id(user_id: int) -> int:
@@ -152,8 +166,7 @@ def get_last_request_id(user_id: int) -> int:
     except sqlite3.DatabaseError as error:
         log.error('get_last_request_id has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_city(city: str, user_id: int) -> None:
@@ -173,8 +186,7 @@ def set_city(city: str, user_id: int) -> None:
     except sqlite3.DatabaseError as error:
         log.error('set_city has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def get_city(user_id: int) -> str:
@@ -195,8 +207,7 @@ def get_city(user_id: int) -> str:
     except sqlite3.DatabaseError as error:
         log.error('get_city has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def get_last_request(user_id: int) -> Tuple[Union[int, str]]:
@@ -219,8 +230,7 @@ def get_last_request(user_id: int) -> Tuple[Union[int, str]]:
     except sqlite3.DatabaseError as error:
         log.error('get_last_request has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_id_city(id_city: str, user_id: int) -> None:
@@ -242,8 +252,7 @@ def set_id_city(id_city: str, user_id: int) -> None:
     except sqlite3.DatabaseError as error:
         log.error('set_id_city has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_check_in(date: str, request_id: int) -> None:
@@ -264,8 +273,7 @@ def set_check_in(date: str, request_id: int) -> None:
     except sqlite3.DatabaseError as error:
         log.error('set_check_in has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_check_out(date: str, request_id: int) -> None:
@@ -286,8 +294,7 @@ def set_check_out(date: str, request_id: int) -> None:
     except sqlite3.DatabaseError as error:
         log.error('set_check_out has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_num_hotels(user_id: int, num_hotels: str) -> Optional[str]:
@@ -317,8 +324,7 @@ def set_num_hotels(user_id: int, num_hotels: str) -> Optional[str]:
         log.error('Введена не цифра', exc_info=error)
         return 'Неверный ввод'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_num_photos(num_photos: str, request_id: int) -> Optional[str]:
@@ -346,8 +352,7 @@ def set_num_photos(num_photos: str, request_id: int) -> Optional[str]:
         log.error('Введена не цифра', exc_info=error)
         return 'Неверный ввод'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def set_request(user_id: int, req_dct: Dict[int, dict[Union[str, str]]]) -> None:
@@ -371,8 +376,7 @@ def set_request(user_id: int, req_dct: Dict[int, dict[Union[str, str]]]) -> None
         log.error('set_request has not been successful', exc_info=error)
 
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def get_request(user_id: int) -> str:
@@ -393,11 +397,10 @@ def get_request(user_id: int) -> str:
     except sqlite3.DatabaseError as error:
         log.error('get_request has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
-def make_min_max_price(message: types.Message) -> Union[str, Tuple[int, int]]:
+def make_min_max_price(message: types.Message) -> Union[str, Tuple[float, float]]:
     """
     Функция, которая принимает сообщение польователя, создает переменные min_price и max_price, добавляет их в БД.
     В случае ошибки с типом входных данных, возвращает строку 'Ошибка ввода'.
@@ -405,8 +408,8 @@ def make_min_max_price(message: types.Message) -> Union[str, Tuple[int, int]]:
     :param message: сообщение от пользователя
     """
     try:
-        min_price = int(message.text.split(' ')[0])
-        max_price = int(message.text.split(' ')[1])
+        min_price = float(message.text.split(' ')[0])
+        max_price = float(message.text.split(' ')[1])
         if min_price < 0 or max_price < 0 or min_price > max_price:
             raise ValueError
 
@@ -423,7 +426,7 @@ def make_min_max_price(message: types.Message) -> Union[str, Tuple[int, int]]:
         return min_price, max_price
 
 
-def set_min_price(min_price: int, user_id:int) -> Optional[bool]:
+def set_min_price(min_price: float, user_id: int) -> Optional[bool]:
     """
     Функция, которая добавляет минимальную цену в таблицу "history_requests"
     :param min_price: минимальная цена
@@ -441,11 +444,10 @@ def set_min_price(min_price: int, user_id:int) -> Optional[bool]:
         log.error('set_city has not been successful', exc_info=error)
         return True
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
-def set_max_price(max_price: int, user_id: int) -> Optional[bool]:
+def set_max_price(max_price: float, user_id: int) -> Optional[bool]:
     """
     Функция, которая добавляет максимальную цену в таблицу "history_requests"
     :param max_price: минимальная цена
@@ -463,11 +465,10 @@ def set_max_price(max_price: int, user_id: int) -> Optional[bool]:
         log.error('set_city has not been successful', exc_info=error)
         return True
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
-def make_min_max_distance(message: types.Message) -> Union[str, Tuple[int, int]]:
+def make_min_max_distance(message: types.Message) -> Union[str, Tuple[float, float]]:
     """
     Функция, которая принимает сообщение польователя, создает переменные min_distance и max_distance, добавляет их в БД.
     В случае ошибки с типом входных данных, возвращает строку 'Ошибка ввода'.
@@ -475,8 +476,8 @@ def make_min_max_distance(message: types.Message) -> Union[str, Tuple[int, int]]
     :param message: сообщение от пользователя
     """
     try:
-        min_distance = int(message.text.split(' ')[0])
-        max_distance = int(message.text.split(' ')[1])
+        min_distance = float(message.text.split(' ')[0])
+        max_distance = float(message.text.split(' ')[1])
         if min_distance < 0 or max_distance < 0 or min_distance > max_distance:
             raise ValueError
 
@@ -493,7 +494,7 @@ def make_min_max_distance(message: types.Message) -> Union[str, Tuple[int, int]]
         return min_distance, max_distance
 
 
-def set_min_distance(min_distance: int, user_id: int) -> Optional[bool]:
+def set_min_distance(min_distance: float, user_id: int) -> Optional[bool]:
     """
     Функция, которая добавляет минимальную дистанцию в таблицу "history_requests"
     :param min_distance: минимальная дистанция
@@ -511,11 +512,10 @@ def set_min_distance(min_distance: int, user_id: int) -> Optional[bool]:
         log.error('set_city has not been successful', exc_info=error)
         return True
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
-def set_max_distance(max_distance: int, user_id: int) -> Optional[bool]:
+def set_max_distance(max_distance: float, user_id: int) -> Optional[bool]:
     """
     Функция, которая добавляет максимальную дистанцию в таблицу "history_requests"
     :param max_distance: максимальная дистанция
@@ -535,11 +535,10 @@ def set_max_distance(max_distance: int, user_id: int) -> Optional[bool]:
         log.error('set_city has not been successful', exc_info=error)
         return True
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
-def get_request_low_high(request_id: int) -> Tuple[str]:
+def get_request_low_high(request_id: int) -> Union[Tuple[Optional[str]], str]:
     """
     Функция, которая возвращает последний запрос пользователя для команд lowprice и highprice.
     :param request_id: id запроса
@@ -552,16 +551,17 @@ def get_request_low_high(request_id: int) -> Tuple[str]:
                     "WHERE request_id = ?;", (request_id,)
                     )
         result = cur.fetchone()
+        log.info(result)
         return result
 
     except sqlite3.DatabaseError as error:
         log.error('get_request_lowprice has not been successful', exc_info=error)
+        return 'ошибка'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
-def get_request_bestdeal(request_id: int) -> Tuple[str]:
+def get_request_bestdeal(request_id: int) -> Union[Tuple[Optional[str]], str]:
     """
     Функция, которая возвращает последний запрос пользователя для команды bestdeal.
     :param request_id: id запроса
@@ -580,9 +580,9 @@ def get_request_bestdeal(request_id: int) -> Tuple[str]:
 
     except sqlite3.DatabaseError as error:
         log.error('get_request_bestdeal has not been successful', exc_info=error)
+        return 'ошибка'
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 
 def get_user_request(user_id: int) -> List[Tuple[Union[int, str]]]:
@@ -603,5 +603,4 @@ def get_user_request(user_id: int) -> List[Tuple[Union[int, str]]]:
     except sqlite3.DatabaseError as error:
         log.error('get_request_lowprice has not been successful', exc_info=error)
     finally:
-        if conn:
-            conn.close()
+        conn.close()

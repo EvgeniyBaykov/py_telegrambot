@@ -36,4 +36,4 @@ venv, который идёт в поставке Python 3.
 
 
 
->2022. by Evgeniy Baykov
+>2022. by [Evgeniy Baykov](https://baykov1995@gmail.com)

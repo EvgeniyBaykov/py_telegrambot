@@ -1,12 +1,16 @@
+import logging
+import re
+import sqlite3
+from typing import Dict, List, Union
+
+import requests
+from telebot import types
+
+
 from body.botrequests.db_functions import get_request_bestdeal, set_request
 from body.botrequests.history import num_nights
 from body.botrequests.lowprice import get_total_price
-import logging
-import re
-import requests
 from settings import photo_size, headers_request
-from telebot import types
-from typing import Dict, List, Union
 
 __all__ = ['get_hotels_from_rapidapi_bestdeal']
 
@@ -26,8 +30,11 @@ def get_hotels_from_rapidapi_bestdeal(user_id: int, request_id: int) -> Union[Di
     url = "https://hotels4.p.rapidapi.com/properties/list"
     headers: Dict[str: str] = headers_request
 
-    id_city, check_in, check_out, min_price, max_price, min_dist, max_dist, num_hotels, photos, request = \
-        get_request_bestdeal(request_id)
+    param_request = get_request_bestdeal(request_id)
+    if type(param_request) is str:
+        raise sqlite3.DatabaseError
+    id_city, check_in, check_out, min_price, max_price, min_dist, max_dist, num_hotels, photos, request = param_request
+
     hotel_dct = dict()
     try:
         for i_page in range(1, 4):
@@ -90,6 +97,10 @@ def get_hotels_from_rapidapi_bestdeal(user_id: int, request_id: int) -> Union[Di
         log.error('Ошибка с получением отелей. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
 
         return 'Технические неполадки с сайтом, попробуйте еще раз.'
+
+    except sqlite3.DatabaseError as error:
+        log.error('Ошибка с БД. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
+        return 'Техническая неполадка. Попробуйте еще раз!'
 
 
 def get_photos_from_rapidapi_bestdeal(hotel_id, num_photos) -> Union[List[types.InputMediaPhoto], str]:

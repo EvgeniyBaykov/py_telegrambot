@@ -1,14 +1,16 @@
-import botrequests
 from datetime import date
-from decouple import config
 import logging.config
 import re
-from settings import LOGGING_CONFIG, max_num_photos, max_num_hotels, id_sticker_time
+import time
+from typing import Dict, List, Tuple, Optional, Union
+
+from decouple import config
 import telebot
 from telebot import types
 from telegram_bot_calendar import DetailedTelegramCalendar
-from typing import Dict, List, Tuple, Optional, Union
-import time
+
+import botrequests
+from settings import LOGGING_CONFIG, max_num_photos, max_num_hotels, id_sticker_time
 
 logging.config.dictConfig(LOGGING_CONFIG)
 log = logging.getLogger(__name__)
@@ -117,8 +119,8 @@ def command_bestdeal(message: types.Message) -> None:
         bot.send_message(message.from_user.id, 'Возникла неполадка c сервисом, попробуйте еще раз')
         send_welcome(message)
     else:
-        msg: types.Message = bot.send_message(message.from_user.id, 'Введите диапазон желаемых цен через пробел '
-                                                                    '(пример: 1500 3000):'
+        msg: types.Message = bot.send_message(message.from_user.id,
+                                              'Введите диапазон желаемых цен через пробел (пример: 1500 3000):'
                                               )
         bot.register_next_step_handler(msg, min_max_price)
 
@@ -287,7 +289,8 @@ def calendar(message: types.Message, message_date: str) -> None:
     calendar_markup, step = DetailedTelegramCalendar(one_time_keyboard=True, min_date=date.today(), locale='ru').build()
     bot.send_message(message.from_user.id,
                      message_date,
-                     reply_markup=calendar_markup)
+                     reply_markup=calendar_markup
+                     )
 
 
 @bot.callback_query_handler(func=DetailedTelegramCalendar.func())
@@ -312,7 +315,8 @@ def callback_date(cal) -> None:
         bot.edit_message_text(message_date,
                               cal.message.chat.id,
                               cal.message.message_id,
-                              reply_markup=key)
+                              reply_markup=key
+                              )
     elif answer:
         if check_in:
             botrequests.set_check_out(answer, request_id)
@@ -522,8 +526,8 @@ def callback_inline(call: types.CallbackQuery) -> None:
     """
 
     log.info('Id запрашиваемого запроса {answer} от пользователя {user_id}'.format(
-        answer=call.data, user_id=call.message.chat.id)
-    )
+            answer=call.data, user_id=call.message.chat.id)
+            )
     if call.data:
         output(call.message.chat.id, int(call.data))
     else:
@@ -532,10 +536,9 @@ def callback_inline(call: types.CallbackQuery) -> None:
 
 @bot.message_handler(content_types=['text'])
 def bot_help(message: types.Message):
-
     if message.text.lower() != 'привет' or '/hello_world' or '/lowprice' or \
             '/highprice' or '/bestdeal' or '/history' or '/restart':
-        msg: str = 'Чтобы начать поиск сайтов напишите "привет" или выберите одну из команд в меню Бота'
+        msg: str = 'Чтобы начать поиск сайтов напишите "привет" или нажмите на команду /hello_world'
         bot.send_message(message.from_user.id, msg)
 
 

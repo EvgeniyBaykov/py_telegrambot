@@ -1,14 +1,20 @@
-from body.botrequests.history import num_nights
-from body.botrequests.db_functions import set_city, get_request_low_high, set_request
 import logging
 import re
-import requests
-from settings import photo_size, headers_request
-from telebot import types
 from typing import Dict, List, Union
+import sqlite3
 
-__all__ = ['get_cities_from_rapidapi', 'get_hotels_from_rapidapi_lowprice', 'get_photos_from_rapidapi_low',
-           'get_total_price']
+import requests
+from telebot import types
+
+from body.botrequests.history import num_nights
+from body.botrequests.db_functions import set_city, get_request_low_high, set_request
+from settings import photo_size, headers_request
+
+__all__ = ['get_cities_from_rapidapi',
+           'get_hotels_from_rapidapi_lowprice',
+           'get_photos_from_rapidapi_low',
+           'get_total_price'
+           ]
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +52,7 @@ def get_cities_from_rapidapi(city: str, user_id: int) -> Union[Dict[str, str], s
 
         return city_dct
 
-    except (requests.exceptions.ConnectionError,  requests.exceptions.ConnectTimeout, TypeError, KeyError,
+    except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout, TypeError, KeyError,
             requests.exceptions.JSONDecodeError, requests.exceptions.ReadTimeout, IndexError) as error:
         log.error('Ошибка с получением города. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
 
@@ -66,7 +72,10 @@ def get_hotels_from_rapidapi_lowprice(user_id: int, request_id: int) -> Union[Di
     url = "https://hotels4.p.rapidapi.com/properties/list"
     headers: Dict[str: str] = headers_request
 
-    id_city, check_in, check_out, num_hotels, photos, request = get_request_low_high(request_id)
+    param_request = get_request_low_high(request_id)
+    if type(param_request) is str:
+        raise sqlite3.DatabaseError
+    id_city, check_in, check_out, num_hotels, photos, request = param_request
 
     querystring_hotel = {"destinationId": id_city, "checkIn": check_in, "checkOut": check_out,
                          "pageSize": num_hotels, "pageNumber": "1", "adults1": "1", "sortOrder": "PRICE",
@@ -118,6 +127,10 @@ def get_hotels_from_rapidapi_lowprice(user_id: int, request_id: int) -> Union[Di
         log.error('Ошибка с получением отелей. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
 
         return 'Технические неполадки с сайтом, попробуйте еще раз.'
+
+    except sqlite3.DatabaseError as error:
+        log.error('Ошибка с БД. user_id: {user_id}'.format(user_id=user_id), exc_info=error)
+        return 'Техническая неполадка. Попробуйте еще раз!'
 
 
 def get_photos_from_rapidapi_low(hotel_id, num_photos) -> Union[List[types.InputMediaPhoto], str]:

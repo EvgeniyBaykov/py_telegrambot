@@ -26,10 +26,9 @@ LOGGING_CONFIG = {
     "root": {"level": "INFO", "handlers": ["logfile"]},
 }
 
-headers_request = {
-        'x-rapidapi-host': "hotels4.p.rapidapi.com",
-        'x-rapidapi-key': config('x-rapidapi-key')
-    }
+headers_request = {'x-rapidapi-host': "hotels4.p.rapidapi.com",
+                   'x-rapidapi-key': config('x-rapidapi-key')
+                   }
 num_history_requests = 3
 max_num_hotels = 9
 max_num_photos = 6
