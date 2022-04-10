@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from math import ceil
 from typing import Tuple, Dict, List, Union, Optional
 
 import sqlite3
@@ -408,8 +409,8 @@ def make_min_max_price(message: types.Message) -> Union[str, Tuple[float, float]
     :param message: сообщение от пользователя
     """
     try:
-        min_price = float(message.text.split(' ')[0])
-        max_price = float(message.text.split(' ')[1])
+        min_price: int = ceil(float(message.text.split(' ')[0]))
+        max_price: int = ceil(float(message.text.split(' ')[1]))
         if min_price < 0 or max_price < 0 or min_price > max_price:
             raise ValueError
 
@@ -426,7 +427,7 @@ def make_min_max_price(message: types.Message) -> Union[str, Tuple[float, float]
         return min_price, max_price
 
 
-def set_min_price(min_price: float, user_id: int) -> Optional[bool]:
+def set_min_price(min_price: int, user_id: int) -> Optional[bool]:
     """
     Функция, которая добавляет минимальную цену в таблицу "history_requests"
     :param min_price: минимальная цена
@@ -447,7 +448,7 @@ def set_min_price(min_price: float, user_id: int) -> Optional[bool]:
         conn.close()
 
 
-def set_max_price(max_price: float, user_id: int) -> Optional[bool]:
+def set_max_price(max_price: int, user_id: int) -> Optional[bool]:
     """
     Функция, которая добавляет максимальную цену в таблицу "history_requests"
     :param max_price: минимальная цена
